@@ -86,8 +86,33 @@
       org-journal-time-prefix "* "
       org-journal-file-format "%m-%d-%Y.org")
 
+(defun db/get-all-directories (directory)
+  "Return a list of DIRECTORY and all its subdirectories, excluding directories with a '.orgexclude' file."
+  (let ((directories '()))
+    (dolist (file (directory-files directory t))
+      (when (and (file-directory-p file)
+                 (not (string-prefix-p "." (file-name-nondirectory file)))
+                 (not (file-exists-p (expand-file-name ".orgexclude" file))))
+        (setq directories (append directories (list file)))))
+    (append (list directory) (mapcan 'db/get-all-directories directories))))
+
+(defun db/get-org-files-in-directories (directories)
+  "Return a list of all .org and .org.gpg files within the given DIRECTORIES."
+  (let ((org-files '()))
+    (dolist (dir directories)
+      (dolist (file (directory-files dir t))
+        (let ((name (file-name-nondirectory file)))
+          (when (or (and (not (string-prefix-p "." name)) (string-suffix-p ".org" name))
+                    (and (not (string-prefix-p "." name)) (string-suffix-p ".org.gpg" name))
+                    )
+            (push file org-files)))))
+    org-files))
+
+(defun db/org-agenda-files ()
+  (db/get-org-files-in-directories (db/get-all-directories org-directory)))
+
 (after! org
-  (setq org-agenda-files '("~/org/journal"))
+  (setq org-agenda-files (db/org-agenda-files))
 )
 
 (setq org-journal-enable-agenda-integration t)
